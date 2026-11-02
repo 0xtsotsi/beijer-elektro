@@ -40,6 +40,11 @@ jobs:
           cp -R public/. _site/
           touch _site/.nojekyll
 
+      - name: Bestanden uploaden
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
       - name: Publiceren
         id: deployment
         uses: actions/deploy-pages@v4
