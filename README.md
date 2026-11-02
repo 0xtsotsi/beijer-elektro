@@ -13,9 +13,6 @@ staat in de repository `jalvdbroek-ship-it/beijer-elektro` en elke keer dat je n
 op een gratis account alleen mogelijk voor openbare repos. Er staat geen
 privékleding of wachtwoord in.
 
-Om de site te delen: onderaan de voettekst staat het adres met een knop om het te
-kopieren, of om het via het deelmenu van je telefoon door te sturen.
-
 ## De site lokaal openen
 
 **Makkelijkst: dubbelklik `index.html`.** De site werkt dan meteen, zonder server.
