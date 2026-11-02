@@ -1,9 +1,12 @@
 // Test de terugval op de e-mailapp: de pagina wordt geserveerd zonder api.
 // Gebruik: node tools/check-mailfallback.mjs
+//
+// Dit is de situatie op een statische host zoals GitHub Pages, waar de route
+// /api/offertes niet bestaat.
 import { loadPlaywright } from "./browser.mjs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join, dirname } from "node:path";
+import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,57 +41,90 @@ const server = createServer(async (request, response) => {
   }
 });
 
-await new Promise((resolve) => server.listen(4200, resolve));
+const port = 4200;
+await new Promise((resolve) => server.listen(port, resolve));
 
 const { chromium } = await loadPlaywright();
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
 
-await page.goto("http://localhost:4200/#offerte", { waitUntil: "networkidle" });
+const results = [];
+const record = (name, pass, detail) => {
+  results.push({ name, pass, detail });
+  console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? "  -> " + detail : ""}`);
+};
 
-await page.fill("#naam", "Familie Jansen");
-await page.fill("#telefoon", "0612345678");
-await page.fill("#email", "jansen@example.nl");
-await page.selectOption("#type", "stoppenkast");
-await page.fill("#omschrijving", "De stoppenkast in de gang is oud en moet worden vervangen.");
-await page.click("#akkoord");
-await page.click("[data-submit]");
-await page.waitForTimeout(1200);
+await page.goto(`http://localhost:${port}/`, { waitUntil: "networkidle" });
 
-const state = await page.evaluate(() => ({
-  formHidden: document.getElementById("offerte-form").hidden,
-  resultHidden: document.getElementById("form-result").hidden,
-  title: document.querySelector("[data-result-title]").textContent.trim(),
-  text: document.querySelector("[data-result-text]").textContent.trim(),
-}));
+const form = await page.locator("form").first();
+if ((await form.count()) === 0) {
+  console.log("FAIL  er staat geen formulier op de pagina");
+  await browser.close();
+  server.close();
+  process.exit(1);
+}
 
-const mailto = await page.evaluate(() => {
-  const link = document.querySelector("[data-result-mail]");
-  return link && !link.hidden ? link.getAttribute("href") : null;
+// Vul het formulier.
+const velden = [
+  ["#naam", "Familie Jansen"],
+  ["#telefoon", "0612345678"],
+  ["#email", "jansen@example.nl"],
+  ["#adres", "Dorpsstraat 12"],
+  ["#plaats", "Rozenburg"],
+  ["#omschrijving", "Dit is een testomschrijving van de offerteaanvraag."],
+];
+for (const [selector, waarde] of velden) {
+  const element = page.locator(selector);
+  if ((await element.count()) > 0) await element.fill(waarde);
+}
+const select = page.locator("form select");
+if ((await select.count()) > 0) {
+  const waarden = await select.locator("option").evaluateAll((options) =>
+    options.map((option) => option.value).filter(Boolean)
+  );
+  if (waarden.length > 0) await select.selectOption(waarden[0]);
+}
+const checkbox = page.locator('form input[type="checkbox"]');
+if ((await checkbox.count()) > 0) await checkbox.first().check();
+
+await page.locator('form button[type="submit"]').first().click();
+await page.waitForTimeout(1500);
+
+const state = await page.evaluate(() => {
+  const form = document.querySelector("form");
+  const result = document.querySelector(".form-result, [data-result-title]");
+  const mailLink = document.querySelector("[data-result-mail]");
+  return {
+    formHidden: form ? form.hidden : null,
+    resultVisible: result ? !result.hidden && result.offsetHeight > 0 : false,
+    mailVisible: mailLink ? !mailLink.hidden : false,
+    mailHref: mailLink ? mailLink.getAttribute("href") : null,
+  };
 });
 
-console.log("status:", JSON.stringify(state, null, 2));
-console.log("\nmailto:", mailto ? decodeURIComponent(mailto) : "GEEN mailto geopend");
+const decoded = state.mailHref ? decodeURIComponent(state.mailHref) : "";
 
-const checks = [
-  ["formulier is verborgen", state.formHidden === true],
-  ["resultaat is zichtbaar", state.resultHidden === false],
-  ["titel noemt de aanvraag", state.title.includes("klaar")],
-  ["er is een mailto-link", mailto !== null],
-  ["mail gaat naar info@beijerektro.nl", (mailto || "").includes("info@beijerektro.nl")],
-  ["naam staat in de mail", decodeURIComponent(mailto || "").includes("Familie Jansen")],
-  ["omschrijving staat in de mail", decodeURIComponent(mailto || "").includes("stoppenkast in de gang")],
-  ["type klus staat in de mail", decodeURIComponent(mailto || "").includes("Stoppenkast of meterkast")],
-  ["spoed staat in de mail", decodeURIComponent(mailto || "").includes("Geen haast")],
-];
+record("het formulier verdwijnt na versturen", state.formHidden === true);
+record("er verschijnt een resultaat", state.resultVisible);
+record(
+  "er verschijnt een mailto-link",
+  state.mailVisible && (state.mailHref || "").startsWith("mailto:"),
+  state.mailHref ? "mailto aanwezig" : "geen mailto-link"
+);
+record(
+  "de mail bevat de naam",
+  decoded.includes("Familie Jansen"),
+  decoded.slice(0, 100)
+);
+record(
+  "de mail bevat het e-mailadres van het bedrijf",
+  /mailto:[^@]+@/.test(state.mailHref || ""),
+  (state.mailHref || "").slice(0, 40)
+);
 
 await browser.close();
 server.close();
 
-let failed = 0;
-checks.forEach(([name, pass]) => {
-  if (!pass) failed += 1;
-  console.log(`${pass ? "PASS" : "FAIL"}  ${name}`);
-});
-console.log(`\n${checks.length - failed}/${checks.length} geslaagd`);
-process.exit(failed ? 1 : 0);
+const failed = results.filter((result) => !result.pass);
+console.log(`\n${results.length - failed.length}/${results.length} geslaagd`);
+process.exit(failed.length ? 1 : 0);

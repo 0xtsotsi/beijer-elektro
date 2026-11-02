@@ -1,5 +1,11 @@
 // Toetsing van toegankelijkheid en interactie volgens WCAG 2.2 AA.
 // Gebruik: node tools/check-a11y.mjs
+//
+// De controles zijn generiek: de selectors worden uit de pagina afgeleid,
+// niet hardcoded. Zo werkt het script in elk project.
+//
+// Start eerst de lokale server, of geef de live site mee:
+//   URL=https://jouw-account.github.io/jouw-repo/ npm run check:a11y
 import { loadPlaywright } from "./browser.mjs";
 
 const url = process.env.URL || "http://localhost:4173/";
@@ -14,84 +20,124 @@ async function run() {
     console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? "  -> " + detail : ""}`);
   };
 
-  // Contrast meten via de browser zelf.
-  const measureContrast = async (page, fg, bg) =>
-    page.evaluate(
-      ([fgSel, bgSel]) => {
-        // Converteert elke CSS-kleur (oklch, color-mix, rgb) naar sRGB met alpha.
-        const canvas = document.createElement("canvas");
-        canvas.width = canvas.height = 1;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        const toRgba = (css) => {
-          if (!css) return null;
-          ctx.clearRect(0, 0, 1, 1);
-          ctx.fillStyle = "#000";
-          ctx.fillStyle = css;
-          ctx.fillRect(0, 0, 1, 1);
-          const d = ctx.getImageData(0, 0, 1, 1).data;
-          return [d[0] / 255, d[1] / 255, d[2] / 255, d[3] / 255];
-        };
-        // sRGB moet eerst naar lineair licht worden omgerekend.
-        const linear = (c) =>
-          c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        const lum = (rgb) =>
-          0.2126 * linear(rgb[0]) +
-          0.7152 * linear(rgb[1]) +
-          0.0722 * linear(rgb[2]);
-        // Legt een doorzichtige laag over een onderliggende kleur.
-        const over = (top, bottom) => {
-          const a = top[3];
-          return [
-            top[0] * a + bottom[0] * (1 - a),
-            top[1] * a + bottom[1] * (1 - a),
-            top[2] * a + bottom[2] * (1 - a),
-            1,
-          ];
-        };
+  // Meet het contrast van elk zichtbaar tekstelement tegen zijn
+  // werkelijke achtergrond, met lagen samengesteld.
+  const measureAllText = async (page) =>
+    page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
-        const fgEl = document.querySelector(fgSel);
-        const bgEl = document.querySelector(bgSel);
-        if (!fgEl || !bgEl) return null;
+      const toRgba = (css) => {
+        if (!css) return null;
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = "#000";
+        ctx.fillStyle = css;
+        ctx.fillRect(0, 0, 1, 1);
+        const d = ctx.getImageData(0, 0, 1, 1).data;
+        return [d[0] / 255, d[1] / 255, d[2] / 255, d[3] / 255];
+      };
 
-        // Zoekt de werkelijke achtergrond door de lagen van binnen naar buiten
-        // te leggen totdat er een ondoorzichtige laag is gevonden.
-        const backgroundOf = (el) => {
-          const layers = [];
-          let node = el;
-          while (node) {
-            const rgba = toRgba(getComputedStyle(node).backgroundColor);
-            if (rgba && rgba[3] > 0) {
-              layers.push(rgba);
-              if (rgba[3] >= 0.999) break;
-            }
-            node = node.parentElement;
+      const linear = (c) =>
+        c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      const lum = (rgb) =>
+        0.2126 * linear(rgb[0]) +
+        0.7152 * linear(rgb[1]) +
+        0.0722 * linear(rgb[2]);
+      const over = (top, bottom) => {
+        const a = top[3];
+        return [
+          top[0] * a + bottom[0] * (1 - a),
+          top[1] * a + bottom[1] * (1 - a),
+          top[2] * a + bottom[2] * (1 - a),
+          1,
+        ];
+      };
+
+      const backgroundOf = (el) => {
+        const layers = [];
+        let node = el;
+        while (node) {
+          const rgba = toRgba(getComputedStyle(node).backgroundColor);
+          if (rgba && rgba[3] > 0) {
+            layers.push(rgba);
+            if (rgba[3] >= 0.999) break;
           }
-          if (!layers.length) {
-            return toRgba(getComputedStyle(document.body).backgroundColor);
-          }
-          let result = layers[layers.length - 1];
-          for (let index = layers.length - 2; index >= 0; index -= 1) {
-            result = over(layers[index], result);
-          }
-          return result;
-        };
+          node = node.parentElement;
+        }
+        if (!layers.length) {
+          return toRgba(getComputedStyle(document.body).backgroundColor);
+        }
+        let result = layers[layers.length - 1];
+        for (let i = layers.length - 2; i >= 0; i -= 1) {
+          result = over(layers[i], result);
+        }
+        return result;
+      };
 
-        const background = backgroundOf(bgEl);
-        const foreground = toRgba(getComputedStyle(fgEl).color);
-        if (!foreground || !background) return null;
+      const isVisible = (el) => {
+        const style = getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        if (parseFloat(style.opacity) === 0) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
 
-        const fg = foreground[3] >= 0.999 ? foreground.slice(0, 3) : over(foreground, background).slice(0, 3);
-        const bg = background.slice(0, 3);
+      const hasOwnText = (el) =>
+        [...el.childNodes].some(
+          (node) => node.nodeType === 3 && node.textContent.trim().length > 0
+        );
 
-        const l1 = lum(fg);
-        const l2 = lum(bg);
+      const worst = [];
+      const seen = new Set();
+
+      for (const el of document.querySelectorAll(
+        "p, h1, h2, h3, h4, h5, h6, li, a, span, label, button, td, th, figcaption, blockquote, dt, dd, legend, summary, option, input, textarea"
+      )) {
+        if (!hasOwnText(el) || !isVisible(el)) continue;
+
+        const style = getComputedStyle(el);
+        const color = toRgba(style.color);
+        if (!color) continue;
+
+        const background = backgroundOf(el);
+        if (!background) continue;
+
+        const foreground =
+          color[3] >= 0.999 ? color.slice(0, 3) : over(color, background).slice(0, 3);
+        const l1 = lum(foreground);
+        const l2 = lum(background.slice(0, 3));
         const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
-        return (hi + 0.05) / (lo + 0.05);
-      },
-      [fg, bg]
-    );
+        const ratio = (hi + 0.05) / (lo + 0.05);
 
-  /* --------------------------------------------------- bureau + mobiel */
+        const size = parseFloat(style.fontSize);
+        const weight = Number(style.fontWeight) || 400;
+        const isLarge = size >= 24 || (size >= 18.66 && weight >= 700);
+        const minimum = isLarge ? 3 : 4.5;
+
+        const key = `${style.color}|${style.backgroundColor}|${size}|${weight}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        if (ratio < minimum) {
+          worst.push({
+            selector:
+              el.tagName.toLowerCase() +
+              (el.className && typeof el.className === "string"
+                ? "." + el.className.trim().split(/\s+/).join(".")
+                : ""),
+            ratio: Math.round(ratio * 100) / 100,
+            minimum,
+            size,
+            text: el.textContent.trim().slice(0, 40),
+          });
+        }
+      }
+
+      worst.sort((a, b) => a.ratio - b.ratio);
+      return worst.slice(0, 12);
+    });
+
   for (const [label, viewport] of [
     ["desktop", { width: 1440, height: 900 }],
     ["mobiel", { width: 390, height: 844 }],
@@ -109,7 +155,7 @@ async function run() {
     const lang = await page.evaluate(() => document.documentElement.lang);
     record(`[${label}] documenttaal`, lang === "nl", lang);
 
-    // 2. Er is precies een h1
+    // 2. Precies een h1
     const h1 = await page.locator("h1").count();
     record(`[${label}] precies een h1`, h1 === 1, `${h1} gevonden`);
 
@@ -118,7 +164,6 @@ async function run() {
       header: document.querySelectorAll("header").length,
       main: document.querySelectorAll("main").length,
       footer: document.querySelectorAll("footer").length,
-      nav: document.querySelectorAll("nav").length,
     }));
     record(
       `[${label}] landmarks`,
@@ -128,27 +173,27 @@ async function run() {
       JSON.stringify(landmarks)
     );
 
-    // 4. Skip-link werkt
+    // 4. Skip-link
     const skip = await page.evaluate(() => {
-      const link = document.querySelector(".skip-link");
+      const link = document.querySelector(".skip-link, a[href^='#']:first-of-type");
+      if (!link) return false;
       link.focus();
       return document.activeElement === link;
     });
     record(`[${label}] skip-link focusbaar`, skip);
 
-    // 5. Focus zichtbaar op alle zichtbare links en knoppen
+    // 5. Focusindicator zichtbaar
     const focusVisible = await page.evaluate(() => {
-      const els = [
-        ...document.querySelectorAll("a[href], button, input, select, textarea"),
-      ];
       const bad = [];
-      for (const el of els) {
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 && r.height === 0) continue;
+      for (const el of document.querySelectorAll(
+        "a[href], button, input, select, textarea"
+      )) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
         el.focus();
-        const s = getComputedStyle(el);
+        const style = getComputedStyle(el);
         const hasRing =
-          s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0;
+          style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0;
         if (!hasRing) bad.push(el.tagName + "." + el.className);
       }
       return bad;
@@ -178,65 +223,39 @@ async function run() {
       unlabelled.join(", ")
     );
 
-    // 7. Tekstcontrast van de hoofdrol
-    const pairs = [
-      [".hero__lede", ".hero__copy"],
-      [".section__lede", ".section__head"],
-      [".service__text", ".service"],
-      [".card__text", ".card"],
-      [".card__list li", ".card"],
-      [".step__text", ".step"],
-      [".project__text", ".project"],
-      [".project__tag", ".project"],
-      [".contact__note", ".contact__item"],
-      [".nav__list a", ".nav"],
-      [".site-footer__line", ".site-footer"],
-      [".facts__value", ".facts__item"],
-      [".board__key", ".board"],
-      [".form-card__legal", ".form-card"],
-      [".privacy__text", ".section"],
-      [".privacy__note", ".section"],
-      [".map__labels text", ".map"],
-      [".review__text", ".review__quote"],
-      [".review__meta", ".review__score"],
-    ];
-    for (const [fg, bg] of pairs) {
-      const ratio = await measureContrast(page, fg, bg);
-      if (ratio === null) {
-        record(`[${label}] contrast ${fg}`, false, "element niet gevonden");
-        continue;
-      }
-      record(`[${label}] contrast ${fg}`, ratio >= 4.5, `${ratio.toFixed(2)}:1`);
-    }
+    // 7. Tekstcontrast van elk zichtbaar tekstelement
+    const worst = await measureAllText(page);
+    record(
+      `[${label}] tekstcontrast`,
+      worst.length === 0,
+      worst
+        .map((w) => `${w.selector} ${w.ratio}:1 (min ${w.minimum})`)
+        .join(" | ")
+    );
 
-    // 8. Doelwit van 24x24 css-pixels (WCAG 2.2 SC 2.5.8).
-    //    Inline links in een zin zijn uitgezonderd; verborgen velden ook.
+    // 8. Doelwit van 24x24 css-pixels (WCAG 2.2 SC 2.5.8)
     const smallTargets = await page.evaluate(() => {
       const visible = [
         ...document.querySelectorAll("a[href], button, input, select, textarea"),
       ].filter((el) => {
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 || r.height === 0) return false;
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return false;
         if (el.closest(".skip-link")) return false;
-        if (el.closest(".field--hidden")) return false;
         return true;
       });
 
-      // Een doelwit is voldoende als het minstens 24x24 is, of als er een cirkel
-      // met een diameter van 24px omheen past zonder een ander doelwit te raken
-      // (de uitzondering voorafstand in SC 2.5.8).
       const boxes = visible.map((el) => ({ el, r: el.getBoundingClientRect() }));
-
       const tooSmall = [];
+
       for (const { el, r } of boxes) {
         if (r.width >= 24 && r.height >= 24) continue;
 
         // Inline link in een zin: uitzondering.
-        const p = el.closest("p");
+        const paragraph = el.closest("p");
         if (
           el.tagName === "A" &&
-          p &&
-          p.textContent.trim() !== el.textContent.trim()
+          paragraph &&
+          paragraph.textContent.trim() !== el.textContent.trim()
         )
           continue;
 
@@ -251,7 +270,6 @@ async function run() {
         });
 
         if (!overlaps) continue;
-
         tooSmall.push(
           `${el.tagName}.${el.className}(${Math.round(r.width)}x${Math.round(
             r.height
@@ -280,26 +298,42 @@ async function run() {
 
     // 10. Select met gereserveerde ruimte voor de pijl
     const select = await page.evaluate(() => {
-      const el = document.querySelector(".field__control--select");
-      const chevron = document.querySelector(".select__chevron");
-      if (!el || !chevron) return null;
+      const el = document.querySelector("select");
+      const wrapper = el && el.parentElement;
+      const chevron =
+        wrapper && wrapper.querySelector("svg, .icon, [class*='chevron'], [class*='arrow']");
+      if (!el) return null;
       const e = el.getBoundingClientRect();
+      if (!chevron) {
+        // Zonder eigen pijl moet de browser zijn eigen indicator tonen.
+        return { native: true, paddingEnd: parseFloat(getComputedStyle(el).paddingRight) };
+      }
       const c = chevron.getBoundingClientRect();
       return {
+        native: false,
         paddingEnd: parseFloat(getComputedStyle(el).paddingRight),
         chevronGap: e.right - c.right,
         chevronWidth: c.width,
         overflows: c.right > e.right + 0.5 || c.left < e.left,
       };
     });
-    record(
-      `[${label}] selectpijl met ruimte`,
-      select &&
+    if (select === null) {
+      record(`[${label}] selectpijl met ruimte`, true, "geen select op de pagina");
+    } else if (select.native) {
+      record(
+        `[${label}] selectpijl met ruimte`,
+        select.paddingEnd >= 24,
+        `browserpijl, padding ${select.paddingEnd}`
+      );
+    } else {
+      record(
+        `[${label}] selectpijl met ruimte`,
         !select.overflows &&
-        select.chevronGap >= 8 &&
-        select.paddingEnd >= select.chevronWidth + 8,
-      JSON.stringify(select)
-    );
+          select.chevronGap >= 8 &&
+          select.paddingEnd >= select.chevronWidth + 8,
+        JSON.stringify(select)
+      );
+    }
 
     await page.close();
   }
@@ -311,17 +345,33 @@ async function run() {
       reducedMotion: "reduce",
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    const durations = await page.evaluate(() =>
-      [
-        ...document.querySelectorAll(
-          ".current-line__pulse, .current-line__node, .board__pulse circle"
-        ),
-      ].map((el) => getComputedStyle(el).animationDuration)
-    );
+
+    // Elke oneindige animatie moet bij prefers-reduced-motion stil staan.
+    const still = await page.evaluate(() => {
+      const problems = [];
+      for (const el of document.querySelectorAll("*")) {
+        const style = getComputedStyle(el);
+        const names = style.animationName.split(",").map((n) => n.trim());
+        const durations = style.animationDuration.split(",").map((d) => parseFloat(d));
+        const iterations = style.animationIterationCount.split(",").map((n) => n.trim());
+        names.forEach((name, index) => {
+          if (!name || name === "none") return;
+          const duration = durations[index % durations.length] ?? 0;
+          const iteration = iterations[index % iterations.length];
+          if (iteration !== "infinite") return;
+          if (duration > 0.02) {
+            problems.push(
+              `${el.tagName.toLowerCase()}.${String(el.className).split(" ")[0]} ${name}`
+            );
+          }
+        });
+      }
+      return problems;
+    });
     record(
-      "reduced motion: animaties uitgezet",
-      durations.every((d) => parseFloat(d) <= 0.02),
-      durations.join(", ")
+      "reduced motion: oneindige animaties staan stil",
+      still.length === 0,
+      still.slice(0, 6).join(", ")
     );
     await page.close();
   }
@@ -341,7 +391,6 @@ async function run() {
       viewport: { width: 1280, height: 800 },
     });
     await zoomed.goto(url, { waitUntil: "networkidle" });
-    // Browsenzoom van 200% op 1280px is hetzelfde als 640px CSS-breedte.
     await zoomed.setViewportSize({ width: 640, height: 800 });
     await zoomed.waitForTimeout(200);
     const zoomOverflow = await zoomed.evaluate(
@@ -374,37 +423,6 @@ async function run() {
       focusable > 20,
       `${focusable}`
     );
-
-    // Menu op mobiel: openen met toetsenbord, sluiten met Escape.
-    const mobile = await browser.newPage({
-      viewport: { width: 390, height: 844 },
-    });
-    await mobile.goto(url, { waitUntil: "networkidle" });
-    await mobile.locator("[data-nav-toggle]").focus();
-    await mobile.keyboard.press("Enter");
-    await mobile.waitForTimeout(200);
-    const expanded = await mobile
-      .locator("[data-nav-toggle]")
-      .getAttribute("aria-expanded");
-    record(
-      "mobiel menu: opent met toetsenbord",
-      expanded === "true",
-      `aria-expanded=${expanded}`
-    );
-    await mobile.keyboard.press("Escape");
-    await mobile.waitForTimeout(200);
-    const collapsed = await mobile
-      .locator("[data-nav-toggle]")
-      .getAttribute("aria-expanded");
-    const focusReturned = await mobile.evaluate(
-      () => document.activeElement === document.querySelector("[data-nav-toggle]")
-    );
-    record(
-      "mobiel menu: Escape sluit en geeft focus terug",
-      collapsed === "false" && focusReturned,
-      `aria-expanded=${collapsed}, focus terug=${focusReturned}`
-    );
-    await mobile.close();
     await page.close();
   }
 

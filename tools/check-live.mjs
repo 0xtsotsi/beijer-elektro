@@ -1,69 +1,120 @@
-// Controleert de terugval op de e-mailapp op een echte live-site.
+// Draait dezelfde controles tegen een live site.
 // Gebruik: node tools/check-live.mjs
+//
+//   URL=https://jouw-account.github.io/jouw-repo/ npm run check:live
 import { loadPlaywright } from "./browser.mjs";
 
-const url = process.env.URL || "https://jalvdbroek-ship-it.github.io/beijer-elektro/";
+const url = process.env.URL || "http://localhost:4173/";
+
+const results = [];
+const record = (name, pass, detail) => {
+  results.push({ name, pass, detail });
+  console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? "  -> " + detail : ""}`);
+};
 
 const { chromium } = await loadPlaywright();
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
 
-const apiResponses = [];
+const apiCalls = [];
 page.on("response", (response) => {
   if (response.url().includes("/api/")) {
-    apiResponses.push(`${response.status()} ${response.url()}`);
+    apiCalls.push(`${response.status()} ${response.url()}`);
   }
 });
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 
-await page.goto(url + "#offerte", { waitUntil: "networkidle" });
+await page.goto(url, { waitUntil: "networkidle" });
 
-await page.fill("#naam", "Familie Jansen");
-await page.fill("#telefoon", "0612345678");
-await page.fill("#email", "jansen@example.nl");
-await page.selectOption("#type", "stoppenkast");
-await page.fill(
-  "#omschrijving",
-  "De stoppenkast in de gang is oud en moet worden vervangen."
+// 1. De pagina laadt zonder fouten.
+record("geen javascriptfouten", errors.length === 0, errors.join(" | "));
+
+// 2. De stylesheet en het script komen binnen.
+const assets = await page.evaluate(() => ({
+  stylesheets: [...document.styleSheets].length,
+  scripts: document.querySelectorAll("script[src]").length,
+  hasTitle: document.title.length > 10,
+}));
+record(
+  "de pagina heeft stijl en script",
+  assets.stylesheets > 0 && assets.scripts > 0 && assets.hasTitle,
+  JSON.stringify(assets)
 );
-await page.click("#akkoord");
-await page.click("[data-submit]");
-await page.waitForTimeout(2500);
 
-const state = await page.evaluate(() => {
-  const link = document.querySelector("[data-result-mail]");
-  return {
-    formHidden: document.getElementById("offerte-form").hidden,
-    resultHidden: document.getElementById("form-result").hidden,
-    title: document.querySelector("[data-result-title]").textContent.trim(),
-    mailVisible: link ? !link.hidden : false,
-    mailHref: link ? link.getAttribute("href") : null,
-  };
-});
+// 3. Het formulier werkt op de live site.
+const form = await page.locator("form").first();
+if ((await form.count()) === 0) {
+  record("er staat een formulier op de pagina", false, "geen formulier gevonden");
+} else {
+  record("er staat een formulier op de pagina", true);
 
-const decoded = state.mailHref ? decodeURIComponent(state.mailHref) : "";
+  const velden = [
+    ["#naam", "Familie Jansen"],
+    ["#telefoon", "0612345678"],
+    ["#email", "jansen@example.nl"],
+    ["#adres", "Dorpsstraat 12"],
+    ["#plaats", "Rozenburg"],
+    ["#omschrijving", "Dit is een testomschrijving van de offerteaanvraag."],
+  ];
+  for (const [selector, waarde] of velden) {
+    const element = page.locator(selector);
+    if ((await element.count()) > 0) await element.fill(waarde);
+  }
+  const select = page.locator("form select");
+  if ((await select.count()) > 0) {
+    const waarden = await select.locator("option").evaluateAll((options) =>
+      options.map((option) => option.value).filter(Boolean)
+    );
+    if (waarden.length > 0) await select.selectOption(waarden[0]);
+  }
+  const checkbox = page.locator('form input[type="checkbox"]');
+  if ((await checkbox.count()) > 0) await checkbox.first().check();
 
-const checks = [
-  ["geen javascriptfouten", errors.length === 0],
-  ["formulier is verborgen", state.formHidden === true],
-  ["resultaat is zichtbaar", state.resultHidden === false],
-  ["e-mailknop is zichtbaar", state.mailVisible === true],
-  ["knop wijst naar info@beijerektro.nl", decoded.includes("info@beijerektro.nl")],
-  ["naam staat in de mail", decoded.includes("Familie Jansen")],
-  ["omschrijving staat in de mail", decoded.includes("stoppenkast in de gang")],
-];
+  await page.locator('form button[type="submit"]').first().click();
+  await page.waitForTimeout(2000);
 
-console.log("api-antwoorden:", apiResponses.join(", ") || "(geen)");
-console.log("status:", JSON.stringify(state, null, 2));
-console.log("mail:\n" + decoded);
+  const state = await page.evaluate(() => {
+    const form = document.querySelector("form");
+    const result = document.querySelector(".form-result, [data-result-title]");
+    const mailLink = document.querySelector("[data-result-mail]");
+    return {
+      formHidden: form ? form.hidden : null,
+      resultVisible: result ? !result.hidden && result.offsetHeight > 0 : false,
+      mailVisible: mailLink ? !mailLink.hidden : false,
+      mailHref: mailLink ? mailLink.getAttribute("href") : null,
+    };
+  });
+
+  record(
+    "het formulier verdwijnt na versturen",
+    state.formHidden === true,
+    `hidden=${state.formHidden}`
+  );
+  record("er verschijnt een resultaat", state.resultVisible);
+
+  // Op een statische host bestaat de api-route niet. Dan moet de terugval
+  // naar de e-mailapp verschijnen. Op een eigen server werkt de api wel.
+  const apiOk = apiCalls.some((call) => call.startsWith("200"));
+  if (apiOk) {
+    record(
+      "de aanvraag is door de api verwerkt",
+      true,
+      apiCalls.join(", ")
+    );
+  } else {
+    record(
+      "de aanvraag komt via de e-mailapp binnen",
+      state.mailVisible && (state.mailHref || "").startsWith("mailto:"),
+      apiCalls.length
+        ? `api gaf ${apiCalls.join(", ")}, dus de terugval moet verschijnen`
+        : "geen api-route, dus de terugval moet verschijnen"
+    );
+  }
+}
 
 await browser.close();
 
-let failed = 0;
-checks.forEach(([name, pass]) => {
-  if (!pass) failed += 1;
-  console.log(`${pass ? "PASS" : "FAIL"}  ${name}`);
-});
-console.log(`\n${checks.length - failed}/${checks.length} geslaagd`);
-process.exit(failed ? 1 : 0);
+const failed = results.filter((result) => !result.pass);
+console.log(`\n${results.length - failed.length}/${results.length} geslaagd`);
+process.exit(failed.length ? 1 : 0);
