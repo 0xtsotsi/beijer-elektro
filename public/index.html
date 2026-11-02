@@ -46,6 +46,11 @@
   <path d="M4 19h16" /></symbol>
     <symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" /></symbol>
+    <symbol id="i-share-2" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" />
+  <circle cx="6" cy="12" r="3" />
+  <circle cx="18" cy="19" r="3" />
+  <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />
+  <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></symbol>
     <symbol id="i-square-stack" viewBox="0 0 24 24"><path d="M4 10c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
   <path d="M10 16c-1.1 0-2-.9-2-2v-4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
   <rect width="8" height="8" x="14" y="14" rx="2" /></symbol>
@@ -1056,6 +1061,23 @@
             <li>Julianastraat 3, 3181 GH Rozenburg</li>
             <li>Maandag tot vrijdag, 08.30 tot 17.00 uur</li>
           </ul>
+
+          <div class="site-footer__share">
+            <span class="site-footer__share-label">Deze website delen</span>
+            <div class="site-footer__share-row">
+              <input
+                class="site-footer__share-input mono"
+                type="text"
+                readonly
+                data-share-url
+                aria-label="Het adres van deze website"
+              />
+              <button class="btn btn--on-dark btn--share" type="button" data-share>
+                <svg class="icon icon--sm" aria-hidden="true"><use href="#i-share-2"></use></svg>
+                <span data-share-label>Kopieer</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

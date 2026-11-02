@@ -73,6 +73,54 @@
   }
 
   /* ---------------------------------------------------------------
+     Deelknop: kopieert het adres van de site, of opent het deelmenu
+     van het apparaat.
+     --------------------------------------------------------------- */
+  const shareUrl = document.querySelector("[data-share-url]");
+  const shareButton = document.querySelector("[data-share]");
+  const shareText = document.querySelector("[data-share-label]");
+
+  if (shareUrl && shareButton) {
+    const adres = window.location.origin + window.location.pathname;
+    shareUrl.value = adres;
+
+    const feedback = (bericht) => {
+      if (!shareText) return;
+      shareText.textContent = bericht;
+      window.setTimeout(() => {
+        shareText.textContent = "Kopieer";
+      }, 2500);
+    };
+
+    shareButton.addEventListener("click", async () => {
+      // Op een telefoon gaat het deelmenu open; dat is handiger dan kopiëren.
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "Beijer Elektro, Rozenburg",
+            text: "Elektrotechniek in Rozenburg. Offerte aanvragen kan 24/7.",
+            url: adres,
+          });
+          return;
+        } catch (error) {
+          // De gebruiker heeft het deelmenu gesloten: niets doen.
+          if (error && error.name === "AbortError") return;
+        }
+      }
+
+      try {
+        await navigator.clipboard.writeText(adres);
+        feedback("Gekopieerd");
+      } catch (error) {
+        // Oudere browsers of een geblokkeerde klembord: selecteer de tekst.
+        shareUrl.focus();
+        shareUrl.select();
+        feedback("Selecteer en kopieer");
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------
      Offerteaanvraag
      --------------------------------------------------------------- */
   const form = document.getElementById("offerte-form");

@@ -1586,6 +1586,45 @@ a.contact__value:hover {
   text-decoration: underline;
 }
 
+.site-footer__share {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid color-mix(in oklab, var(--surface) 18%, transparent);
+}
+
+.site-footer__share-label {
+  display: block;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: var(--space-3);
+}
+
+.site-footer__share-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.site-footer__share-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--surface) 22%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--surface) 8%, transparent);
+  color: color-mix(in oklab, var(--surface) 88%, transparent);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+}
+
+.btn--share {
+  flex: none;
+  padding-inline: var(--space-4);
+}
+
 .site-footer__bottom {
   display: flex;
   flex-wrap: wrap;
