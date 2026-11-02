@@ -1,0 +1,21 @@
+{
+  "name": "beijer-elektro-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Website van Electrotechnisch Bedrijf Beijer, Rozenburg",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "icons": "node tools/build-icons.mjs",
+    "photos": "node tools/build-photos.mjs",
+    "contrast": "node tools/contrast.mjs",
+    "check:a11y": "node tools/check-a11y.mjs",
+    "check:content": "node tools/check-content.mjs",
+    "check:form": "node tools/check-form.mjs",
+    "check:current": "node tools/check-current.mjs",
+    "shots": "node tools/shoot-sections.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "meterkast": {
+    "file": "meterkast.jpg",
+    "alt": "Vervangen stoppenkast in de gang van een woning"
+  },
+  "verlichting": {
+    "file": "verlichting.jpg",
+    "alt": "Aangelegde ledverlichting in een woonruimte"
+  },
+  "laadpaal": {
+    "file": "laadpaal.jpg",
+    "alt": "Geïnstalleerde laadpaal aan een woning"
+  },
+  "zonnepanelen": {
+    "file": "zonnepanelen.jpg",
+    "alt": "Geïnstalleerde zonnepanelen op een dak"
+  }
+}

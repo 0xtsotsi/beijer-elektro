@@ -1,0 +1,10 @@
+Zet hier uw eigen projectfoto's neer met deze bestandsnamen:
+
+  meterkast.jpg     (stoppenkast of meterkast)
+  verlichting.jpg   (verlichting binnen of buiten)
+  laadpaal.jpg      (laadpaal)
+  zonnepanelen.jpg  (zonnepanelen)
+
+Bestandsnaam exact in kleine letters. De website toont dan automatisch de foto
+in plaats van de illustratie. Gebruik bij voorkeur een liggend formaat van
+minstens 1200 x 900 pixels.
