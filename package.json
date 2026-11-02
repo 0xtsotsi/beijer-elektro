@@ -13,6 +13,8 @@
     "check:content": "node tools/check-content.mjs",
     "check:form": "node tools/check-form.mjs",
     "check:current": "node tools/check-current.mjs",
+    "check:mail": "node tools/check-mailfallback.mjs",
+    "check:live": "node tools/check-live.mjs",
     "shots": "node tools/shoot-sections.mjs"
   },
   "engines": {
