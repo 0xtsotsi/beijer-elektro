@@ -1,4 +1,4 @@
-// Bouwt de inline icon-sprite in public/index.html.
+// Bouwt de inline icon-sprite in index.html.
 // Gebruik: node tools/build-icons.mjs
 //
 // Pictogrammen komen uit de Lucide-tekenset (ISC-licentie). Ontbrekende
@@ -20,7 +20,7 @@ const CDN = `https://cdn.jsdelivr.net/npm/lucide-static@${LUCIDE_VERSION}/icons`
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const iconDir = join(root, ".icons");
-const target = join(root, "public", "index.html");
+const target = join(root, "index.html");
 
 async function fetchIcon(name) {
   const response = await fetch(`${CDN}/${name}.svg`);
@@ -61,7 +61,7 @@ const block = `<!-- sprite:start -->\n    <svg class="sprite" aria-hidden="true"
 
 const pattern = /<!-- sprite:start -->[\s\S]*?<!-- sprite:end -->/;
 if (!pattern.test(html)) {
-  console.error("Geen sprite-markers gevonden in public/index.html");
+  console.error("Geen sprite-markers gevonden in index.html");
   process.exit(1);
 }
 

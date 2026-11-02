@@ -2,16 +2,15 @@
 // Start: node server.js (of: npm start) — geen externe pakketten nodig.
 import { createServer } from "node:http";
 import { readFile, appendFile, mkdir } from "node:fs/promises";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
-const publicDir = join(root, "public");
-const dataDir = join(root, "data");
+const dataDir = resolve(root, "data");
 const port = Number(process.env.PORT || 4173);
 
-const mime = {
+const mimeTypes = Object.freeze({
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -24,7 +23,13 @@ const mime = {
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8",
-};
+});
+
+// Alleen de website zelf wordt geserveerd, niet de scripts of de documentatie.
+const publicRootFiles = new Set(["index.html"]);
+const isPublicFile = (relativePath) =>
+  publicRootFiles.has(basename(relativePath)) ||
+  relativePath.startsWith("assets/");
 
 const rules = {
   naam: (value) =>
@@ -36,7 +41,8 @@ const rules = {
       ? ""
       : "Vul een telefoonnummer in waar wij u kunnen bellen.",
   email: (value) =>
-    typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim())
+    typeof value === "string" &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim())
       ? ""
       : "Vul een geldig e-mailadres in.",
   type: (value) => (typeof value === "string" && value ? "" : "Kies het type klus."),
@@ -117,7 +123,11 @@ async function handleOfferte(req, res) {
   };
 
   await mkdir(dataDir, { recursive: true });
-  await appendFile(join(dataDir, "offertes.jsonl"), JSON.stringify(entry) + "\n", "utf8");
+  await appendFile(
+    resolve(dataDir, "offertes.jsonl"),
+    JSON.stringify(entry) + "\n",
+    "utf8"
+  );
 
   console.log(
     `[${new Date().toLocaleTimeString("nl-NL")}] Offerteaanvraag ontvangen: ${entry.naam} (${entry.type})`
@@ -126,19 +136,33 @@ async function handleOfferte(req, res) {
 }
 
 async function serveStatic(req, res, pathname) {
-  const relative = normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/, "");
-  const filePath = join(publicDir, relative === "" ? "index.html" : relative);
+  const pathSegments = pathname.split("/").filter(Boolean);
+  if (pathSegments.some((segment) => segment.startsWith("."))) {
+    res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+    res.end("<!doctype html><title>Niet gevonden</title><p>Niet gevonden</p>");
+    return;
+  }
 
-  if (!filePath.startsWith(publicDir + sep) && filePath !== join(publicDir, "index.html")) {
-    res.writeHead(403).end("Verboden");
+  const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const filePath = resolve(root, relativePath);
+  const extension = extname(filePath).toLowerCase();
+
+  const insideRoot =
+    filePath === root || filePath.startsWith(`${root}${sep}`);
+  if (
+    !insideRoot ||
+    !mimeTypes[extension] ||
+    !isPublicFile(relativePath)
+  ) {
+    res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+    res.end("<!doctype html><title>Niet gevonden</title><p>Niet gevonden</p>");
     return;
   }
 
   try {
     const file = await readFile(filePath);
-    const type = mime[extname(filePath).toLowerCase()] || "application/octet-stream";
     res.writeHead(200, {
-      "Content-Type": type,
+      "Content-Type": mimeTypes[extension],
       "Content-Length": file.length,
       "Cache-Control": "no-store",
     });
@@ -173,7 +197,8 @@ const server = createServer((req, res) => {
   }
 
   if (req.method !== "GET" && req.method !== "HEAD") {
-    res.writeHead(405).end("Methode niet toegestaan");
+    res.writeHead(405, { Allow: "GET, HEAD" });
+    res.end("Methode niet toegestaan");
     return;
   }
 

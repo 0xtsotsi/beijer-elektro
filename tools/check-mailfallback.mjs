@@ -7,7 +7,7 @@ import { extname, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const publicDir = join(root, "public");
+const siteDir = join(root);
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -24,7 +24,7 @@ const server = createServer(async (request, response) => {
     new URL(request.url, "http://localhost").pathname
   );
   const relative = pathname.replace(/^\/+/, "");
-  const file = join(publicDir, relative === "" ? "index.html" : relative);
+  const file = join(siteDir, relative === "" ? "index.html" : relative);
   try {
     const content = await readFile(file);
     response.writeHead(200, {

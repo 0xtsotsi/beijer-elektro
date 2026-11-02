@@ -1,87 +1,70 @@
-# Website Electrotechnisch Bedrijf Beijer, Rozenburg
+# Beijer Elektro — website
 
-Een eenpagina-site voor Beijer Elektro. Statische HTML, CSS en JavaScript, met
-een kleine Node-server voor lokaal gebruik en de ontvangst van offerteaanvragen.
+Een statische website voor **Electrotechnisch Bedrijf Beijer**, Julianastraat 3 in
+Rozenburg (ZH). Geen build-stap, geen dependencies.
 
-## Live
+## De live site
 
 **https://jalvdbroek-ship-it.github.io/beijer-elektro/**
 
-De site wordt bij elke push naar `main` opnieuw gepubliceerd door de workflow
-in `.github/workflows/deploy.yml`. De map `public/` is de enige bron.
+Die link is permanent en altijd bereikbaar. De site staat op GitHub Pages: de code
+staat in de repository `jalvdbroek-ship-it/beijer-elektro` en elke keer dat je naar
+`main` pusht, bouwt GitHub de site opnieuw. De repo is openbaar, want GitHub Pages is
+op een gratis account alleen mogelijk voor openbare repos. Er staat geen
+privékleding of wachtwoord in.
 
-## Starten
+Om de site te delen: onderaan de voettekst staat het adres met een knop om het te
+kopieren, of om het via het deelmenu van je telefoon door te sturen.
 
-```bash
-npm start
+## De site lokaal openen
+
+**Makkelijkst: dubbelklik `index.html`.** De site werkt dan meteen, zonder server.
+Het offerteformulier laat dan het e-mailprogramma van de bezoeker openen, precies
+als op de live site.
+
+**Met een lokale server** (aanbevolen, want dan werkt ook de route
+`/api/offertes` waarmee aanvragen in `data/offertes.jsonl` worden bewaard):
+
+- Windows: dubbelklik **`start-site.bat`**. De browser gaat vanzelf open op
+  `http://localhost:4173`. Sluit het venster om te stoppen.
+- Of via de terminal: `npm start`, en open daarna <http://localhost:4173>.
+
+## Mapstructuur
+
+```
+index.html              de hele site
+assets/css/style.css    alle stijlen, met OKLCH-kleurtokens
+assets/js/main.js       mobiel menu, projectfoto's en het offerteformulier
+assets/img/             favicon en de plek voor de projectfoto's
+server.js               lokale server met de route /api/offertes
+start-site.bat          start de lokale server en open de browser
+DESIGN.md               ontwerpkeuzes en de kleurcontrasten
+tools/                  scripts voor pictogrammen, contrast en toetsing
 ```
 
-De site draait dan op <http://localhost:4173>. Er zijn geen externe pakketten
-nodig.
+## De site online zetten
 
-## Opbouw
+De site staat op GitHub Pages. Om iets te wijzigen:
 
-```
-public/
-  index.html              de pagina
-  assets/css/style.css    alle stijlen, met OKLCH-tokens
-  assets/js/main.js       menu, projectfoto's en het offerteformulier
-  assets/img/projecten/   plek voor uw eigen projectfoto's
-server.js                 lokale server + API voor offerteaanvragen
-tools/                    scripts voor pictogrammen, contrast en toetsing
-data/offertes.jsonl       binnenkomende aanvragen (lokaal)
-DESIGN.md                 de ontwerpnotitie
-```
+1. Pas de bestanden aan in deze map.
+2. `git add` en `git commit`.
+3. `git push origin main`.
 
-## Publiceren
+GitHub bouwt de site daarna binnen een minuut opnieuw. De URL blijft hetzelfde.
 
-De map `public/` is de hele website. Die staat online op GitHub Pages en kan
-naar elke andere statische host (Netlify, Cloudflare Pages, uw eigen host)
-worden gekopieerd. De Node-server uit `server.js` is alleen nodig voor lokaal
-gebruik en voor het ontvangen van offerteaanvragen.
-
-Op de live site bestaat de route `/api/offertes` niet, omdat Pages alleen
-statische bestanden serveert. Het formulier merkt dat op en toont een knop
-waarmee de bezoeker zijn eigen e-mailprogramma opent. De aanvraag staat daar
-al voor ingevuld. Het adres van die knop staat in `public/assets/js/main.js`
-bij `MAIL_ADRES`; verandert het e-mailadres, dan verandert die waarde mee.
-
-Wilt u aanvragen liever automatisch ontvangen zonder e-mailprogramma, dan is
-een eigen server nodig, of een formulierdienst die de aanvraag naar uw e-mail
-of agenda stuurt.
-
-## Projectfoto's toevoegen
-
-Zet uw foto's in `public/assets/img/projecten/` met deze namen:
-
-| Bestandsnaam      | Onderwerp                |
-| ----------------- | ------------------------ |
-| `meterkast.jpg`   | stoppenkast of meterkast |
-| `verlichting.jpg` | verlichting              |
-| `laadpaal.jpg`    | laadpaal                 |
-| `zonnepanelen.jpg`| zonnepanelen             |
-
-Daarna `npm run photos` uitvoeren en de foto's committen. De website toont dan
-automatisch de foto in plaats van de illustratie. Zonder foto blijft de
-illustratie staan.
+De workflow in `.github/workflows/pages.yml` doet dat automatisch bij elke push.
 
 ## Controle
 
 ```bash
 npm run contrast      # WCAG-contrast van het kleurenpalet
-npm run check:a11y    # toegankelijkheid, contrast, doelwit, reflow
+npm run check:a11y    # toegankelijkheid, contrast, doelwit en reflow
 npm run check:content # koppenstructuur, sterrenbeoordeling, em-dash
-npm run check:form    # volledige invulflow van het offerteformulier
-npm run check:current # synchronisatie van de stroomlijn
-npm run check:mail    # terugval op de e-mailapp zonder api-route
+npm run check:form    # de volledige invulflow van het offerteformulier
+npm run check:current # of de stroomlijn en de contactpunten in de pas lopen
+npm run check:mail    # de terugval op de e-mailapp zonder api-route
 npm run check:live    # dezelfde controle tegen de live site
 npm run shots         # opnames van elke sectie in .gg/screenshots
-```
-
-De live controles gebruiken de omgevingsvariabele `URL`:
-
-```bash
-URL=https://jalvdbroek-ship-it.github.io/beijer-elektro/ npm run check:live
 ```
 
 De controles draaien op Chromium via Playwright. Installeer die een keer met:
@@ -93,27 +76,47 @@ npx playwright install chromium
 
 De website zelf heeft geen pakketten nodig; alleen de controles wel.
 
-## Nog te doen voor livegang
+## Wat er staat vast
 
-1. **E-mailadres controleren.** Op de site staat `info@beijerektro.nl`. Dit adres
-   is niet bevestigd; controleer het en pas het aan in `public/index.html`.
+- **KvK 24226048**, eenmanszaak, opgericht 1 september 1976, twee medewerkers.
+- **Telefoon 0181 212 765**, 24/7 bereikbaar.
+- **Openingstijden** maandag tot vrijdag, 08.30 tot 17.00 uur.
+- **Werkgebied**: Rozenburg, Brielle, Maassluis, Vlaardingen, Hoek van Holland,
+  Zwartewaal, Oud-Beijerland en Spijkenisse.
+- **Beoordeling 3,7 van de 5** op Google, op basis van 3 reviews. Die score staat
+  zo op de site: drie volle sterren en een vierde voor 74 procent gevuld.
+
+## Wat je nog moet doen voor live gang
+
+1. **E-mailadres controleren.** Op de site staat `info@beijerektro.nl`. Dat adres is
+   nergens openbaar gevonden, dus controleer het. Het staat op twee plekken:
+   `assets/js/main.js` bij `MAIL_ADRES` en in `index.html` bij de contactgegevens.
 2. **WhatsApp-nummer controleren.** De link gebruikt het telefoonnummer
-   `+31 181 212765`. Controleer of dat het WhatsApp-nummer is.
+   `+31 181 212765`. Controleer of dat ook het WhatsApp-nummer is.
 3. **Privacyverklaring laten nakijken.** De tekst is een voorstel. Laat hem
    aanvullen met de hostingspartij en de bewaartermijn. Onderaan de
    privacyverklaring staat een regel die hier om vraagt; haal die weg zodra de
    verklaring definitief is.
-4. **Projectfoto's plaatsen** en `npm run photos` uitvoeren.
-5. **Aanvraag doorsturen.** Op de live site opent het formulier het
-   e-mailprogramma van de bezoeker, met de aanvraag ingevuld. Dat werkt, maar
-   niet iedereen verstuurt de mail daarna. Een formulierdienst of een eigen
-   server geeft meer zekerheid.
+4. **Projectfoto's plaatsen** in `assets/img/projecten/` met de namen
+   `meterkast.jpg`, `verlichting.jpg`, `laadpaal.jpg` en `zonnepanelen.jpg`. Draai
+   daarna `npm run photos` en commit de bestanden. Zonder foto blijft de
+   illustratie staan.
+5. **Aanvragen doorsturen.** Op de live site opent het formulier het
+   e-mailprogramma van de bezoeker, met de aanvraag ingevuld. Dat werkt, maar niet
+   iedereen verstuurt de mail daarna. Een formulierdienst of een eigen server
+   geeft meer zekerheid.
 6. **KvK-nummer controleren** in de footer. Het nummer 24226048 komt uit de
    openbare bedrijfsgegevens.
 
-## Beeldmateriaal
+## Techniek
 
-De pictogrammen komen uit [Lucide](https://lucide.dev) (ISC-licentie). De
-tekeningen van de meterkast en de werkgebiedkaart zijn zelf getekend. Zolang er
-geen eigen foto's zijn, tonen de projectvakjes een illustratie met het label
-"Foto volgt".
+Standaard HTML, CSS en JavaScript, zonder frameworks. De kleuren staan als
+OKLCH-tokens in `assets/css/style.css` en zijn gemeten op WCAG 2.2 AA; de
+controle daarop staat in `tools/contrast.mjs`. De pictogrammen komen uit
+[Lucide](https://lucide.dev) (ISC-licentie) en staan als inline sprite in
+`index.html`. De tekeningen van de meterkast en de werkgebiedkaart zijn zelf
+getekend. De lettertypen komen van Google Fonts (Archivo en IBM Plex Mono).
+
+De stroomlijn onder de kop is de enige beweging op de pagina: een koperen straal
+loopt over de lijn en de contactpunten lichten op als de straal ze bereikt. Met
+`prefers-reduced-motion` staat alles stil.

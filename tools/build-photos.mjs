@@ -1,4 +1,4 @@
-// Scant public/assets/img/projecten en schrijft manifest.json met de foto's
+// Scant assets/img/projecten en schrijft manifest.json met de foto's
 // die er daadwerkelijk staan. De website toont alleen bestaande foto's.
 // Gebruik: node tools/build-photos.mjs
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const photoDir = join(root, "public", "assets", "img", "projecten");
+const photoDir = join(root, "assets", "img", "projecten");
 const configPath = join(root, "tools", "photos.config.json");
 const manifestPath = join(photoDir, "manifest.json");
 
