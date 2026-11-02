@@ -84,9 +84,56 @@
   const resultTitle = result.querySelector("[data-result-title]");
   const resultText = result.querySelector("[data-result-text]");
   const resetButton = result.querySelector("[data-result-reset]");
+  const mailLink = result.querySelector("[data-result-mail]");
   const submitButton = form.querySelector("[data-submit]");
   const submitLabel = form.querySelector("[data-submit-label]");
   const spinner = form.querySelector("[data-spinner]");
+
+  // Het adres waar de aanvraag naartoe gaat. Staat ook in de contactgegevens
+  // onderaan de pagina, zodat beide plekken bijgewerkt worden.
+  const MAIL_ADRES = "info@beijerektro.nl";
+
+  const KLUS_TYPES = {
+    stoppenkast: "Stoppenkast of meterkast",
+    installatie: "Nieuwe installatie of uitbreiding",
+    storing: "Storing of onderhoud",
+    verlichting: "Verlichting",
+    laadpaal: "Laadpaal",
+    zonnepanelen: "Zonnepanelen",
+    beveiliging: "Beveiliging",
+    domotica: "Domotica of datanetwerk",
+    zakelijk: "Zakelijk werk",
+    anders: "Anders",
+  };
+
+  const SPOED = {
+    "geen-haast": "Geen haast",
+    "binnen-een-week": "Binnen een week",
+    spoed: "Storing, zo snel mogelijk",
+  };
+
+  // Zet de aanvraag klaar als mailto-link.
+  const buildMailLink = (payload) => {
+    const regels = [
+      `Naam: ${payload.naam}`,
+      `Telefoon: ${payload.telefoon}`,
+      `E-mail: ${payload.email}`,
+      payload.adres ? `Adres: ${payload.adres}` : "",
+      payload.plaats ? `Plaats: ${payload.plaats}` : "",
+      `Type klus: ${KLUS_TYPES[payload.type] || payload.type}`,
+      `Hoe snel: ${SPOED[payload.spoed] || payload.spoed}`,
+      "",
+      "Omschrijving:",
+      payload.omschrijving,
+    ].filter(Boolean);
+
+    const body = regels.join("\n");
+    return (
+      `mailto:${MAIL_ADRES}` +
+      `?subject=${encodeURIComponent("Offerteaanvraag via de website")}` +
+      `&body=${encodeURIComponent(body)}`
+    );
+  };
 
   const rules = {
     naam: (value) =>
@@ -218,6 +265,7 @@
           });
           const firstName = Object.keys(data.errors)[0];
           if (firstName && form.elements[firstName]) form.elements[firstName].focus();
+          throw new Error("validatiefout");
         }
         throw new Error("verzenden mislukt");
       }
@@ -230,9 +278,25 @@
         "0181 212 765, wij zijn 24/7 bereikbaar.";
       result.focus();
     } catch (error) {
-      status.className = "form-card__note form-card__note--error";
-      status.textContent =
-        "Verzenden lukte niet. Probeer het nog eens, of bel ons op 0181 212 765. Uw ingevulde gegevens staan nog in het formulier.";
+      // Op een statische host bestaat de api-route niet. Dan krijgt de
+      // bezoeker een mailto-link met de aanvraag erin.
+      if (error.message === "validatiefout") {
+        status.className = "form-card__note form-card__note--error";
+        status.textContent =
+          "Er staan nog velden klaar die wij nog nodig hebben. Zie de meldingen bij de velden.";
+        return;
+      }
+
+      form.hidden = true;
+      result.hidden = false;
+      resultTitle.textContent = "Uw aanvraag staat klaar";
+      resultText.textContent =
+        "Klik op de knop hieronder om uw e-mailprogramma te openen. De aanvraag " +
+        "staat daar voor ingevuld. Lukt het niet, bel ons dan op 0181 212 765, wij " +
+        "zijn 24/7 bereikbaar.";
+      mailLink.href = buildMailLink(payload);
+      mailLink.hidden = false;
+      result.focus();
     } finally {
       submitButton.disabled = false;
       submitButton.removeAttribute("aria-disabled");
@@ -246,6 +310,8 @@
     clearAllErrors();
     submitted = false;
     result.hidden = true;
+    mailLink.hidden = true;
+    mailLink.removeAttribute("href");
     form.hidden = false;
     status.className = "form-card__note";
     status.textContent = "Velden met een sterretje zijn verplicht.";
