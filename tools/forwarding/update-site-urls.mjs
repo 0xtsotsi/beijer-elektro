@@ -111,6 +111,7 @@ for (const site of sites.filter((item) => !only || item.repo === only)) {
     (item) =>
       item.type === "blob" &&
       item.size < 300000 &&
+      !item.path.startsWith("tools/forwarding/") &&
       TEXT_EXT.has(path.extname(item.path).toLowerCase())
   );
 
