@@ -2,7 +2,8 @@
 // Gebruik: node tools/forwarding/update-site-urls.mjs [--only <repo>] [--dry-run]
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, rmSync } from "node:fs";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -39,36 +40,72 @@ function gh(args, { allowFail = false } = {}) {
   }
 }
 
-function repoExists(owner, repo) {
-  return gh(["api", `repos/${owner}/${repo}`], { allowFail: true }) !== null;
+function repoFullName(owner, repo) {
+  const out = gh(["api", `repos/${owner}/${repo}`], { allowFail: true });
+  if (!out) return null;
+  try {
+    return JSON.parse(out).full_name;
+  } catch {
+    return null;
+  }
+}
+
+function fileSha(owner, repo, filePath) {
+  const out = gh(["api", `repos/${owner}/${repo}/contents/${filePath}`], { allowFail: true });
+  if (!out) return null;
+  try {
+    return JSON.parse(out).sha;
+  } catch {
+    return null;
+  }
 }
 
 function putFile(owner, repo, filePath, content, message) {
-  const base64 = Buffer.from(content, "utf8").toString("base64");
-  gh([
-    "api",
-    "--method",
-    "PUT",
-    `repos/${owner}/${repo}/contents/${filePath}`,
-    "-f",
-    `message=${message}`,
-    "-f",
-    `content=${base64}`,
-    "-f",
-    "branch=main",
-  ]);
+  const payload = {
+    message,
+    content: Buffer.from(content, "utf8").toString("base64"),
+    branch: "main",
+  };
+  const sha = fileSha(owner, repo, filePath);
+  if (sha) payload.sha = sha;
+  const tmp = path.join(os.tmpdir(), `gh-payload-${process.pid}-${Date.now()}.json`);
+  writeFileSync(tmp, JSON.stringify(payload));
+  try {
+    gh([
+      "api",
+      "--method",
+      "PUT",
+      `repos/${owner}/${repo}/contents/${filePath}`,
+      "--input",
+      tmp,
+    ]);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
+function rewrite(text, site, newRepo) {
+  let updated = text;
+  updated = updated
+    .split(`${oldOwner}/${site.repo}`)
+    .join(`${newOwner}/${newRepo}`);
+  if (newRepo !== site.repo) {
+    updated = updated.split(`github.io/${site.repo}`).join(`github.io/${newRepo}`);
+  }
+  return updated.split(oldOwner).join(newOwner);
 }
 
 for (const site of sites.filter((item) => !only || item.repo === only)) {
   const owner = newOwner;
+  const newRepo = site.newRepo || site.repo;
   console.log(`\n=== ${site.repo} ===`);
-  if (!repoExists(owner, site.repo)) {
+  if (repoFullName(owner, newRepo) !== `${owner}/${newRepo}`) {
     console.log("  staat nog niet bij de nieuwe eigenaar, overslaan");
     continue;
   }
 
   const tree = JSON.parse(
-    gh(["api", `repos/${owner}/${site.repo}/git/trees/main?recursive=1`])
+    gh(["api", `repos/${owner}/${newRepo}/git/trees/main?recursive=1`])
   );
   const candidates = tree.tree.filter(
     (item) =>
@@ -79,7 +116,7 @@ for (const site of sites.filter((item) => !only || item.repo === only)) {
 
   let changed = 0;
   for (const item of candidates) {
-    const raw = gh(["api", `repos/${owner}/${site.repo}/contents/${item.path}`], {
+    const raw = gh(["api", `repos/${owner}/${newRepo}/contents/${item.path}`], {
       allowFail: true,
     });
     if (!raw) continue;
@@ -88,14 +125,15 @@ for (const site of sites.filter((item) => !only || item.repo === only)) {
     const text = Buffer.from(payload.content, "base64").toString("utf8");
     if (!text.includes(oldOwner)) continue;
 
-    const updated = text.split(oldOwner).join(newOwner);
+    const updated = rewrite(text, site, newRepo);
+    if (updated === text) continue;
     changed += 1;
     if (dryRun) {
       console.log(`  zou ${item.path} bijwerken`);
     } else {
       putFile(
         owner,
-        site.repo,
+        newRepo,
         item.path,
         updated,
         `Werk de verwijzingen naar ${newOwner} bij`
@@ -103,5 +141,9 @@ for (const site of sites.filter((item) => !only || item.repo === only)) {
       console.log(`  ${item.path} bijgewerkt`);
     }
   }
-  console.log(changed === 0 ? "  geen verwijzingen naar de oude eigenaar gevonden" : `  ${changed} bestand(en) bijgewerkt`);
+  console.log(
+    changed === 0
+      ? "  geen verwijzingen naar de oude eigenaar gevonden"
+      : `  ${changed} bestand(en) bijgewerkt`
+  );
 }

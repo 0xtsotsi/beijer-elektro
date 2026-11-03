@@ -2,7 +2,8 @@
 // Gebruik: node tools/forwarding/create-forwarding.mjs [--only <repo>] [--dry-run]
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, rmSync } from "node:fs";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { buildRedirect, buildNotFound, repoPathFor } from "./build-redirect.mjs";
@@ -62,29 +63,52 @@ function gh(args, { allowFail = false } = {}) {
   }
 }
 
-function repoExists(owner, repo) {
+function repoInfo(owner, repo) {
   const out = gh(["api", `repos/${owner}/${repo}`], { allowFail: true });
-  return out !== null;
+  if (!out) return null;
+  try {
+    return JSON.parse(out);
+  } catch {
+    return null;
+  }
+}
+
+function fileSha(owner, repo, filePath) {
+  const out = gh(["api", `repos/${owner}/${repo}/contents/${filePath}`], { allowFail: true });
+  if (!out) return null;
+  try {
+    return JSON.parse(out).sha;
+  } catch {
+    return null;
+  }
 }
 
 function putFile(owner, repo, filePath, content, message) {
-  const base64 = Buffer.from(content, "utf8").toString("base64");
-  gh([
-    "api",
-    "--method",
-    "PUT",
-    `repos/${owner}/${repo}/contents/${filePath}`,
-    "-f",
-    `message=${message}`,
-    "-f",
-    `content=${base64}`,
-    "-f",
-    "branch=main",
-  ]);
+  const payload = {
+    message,
+    content: Buffer.from(content, "utf8").toString("base64"),
+    branch: "main",
+  };
+  const sha = fileSha(owner, repo, filePath);
+  if (sha) payload.sha = sha;
+  const tmp = path.join(os.tmpdir(), `gh-payload-${process.pid}-${Date.now()}.json`);
+  writeFileSync(tmp, JSON.stringify(payload));
+  try {
+    gh([
+      "api",
+      "--method",
+      "PUT",
+      `repos/${owner}/${repo}/contents/${filePath}`,
+      "--input",
+      tmp,
+    ]);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
 }
 
-function readme(site) {
-  const base = `https://${newOwner}.github.io/${site.repo}`;
+function readme(site, newRepo) {
+  const base = `https://${newOwner}.github.io/${newRepo}`;
   const rows = site.pages
     .map((page) => `| \`${repoPathFor(page)}\` | doorstuurpagina voor ${page} |`)
     .join("\n");
@@ -163,21 +187,31 @@ async function run() {
   }
 
   for (const site of targets) {
-    const base = `https://${newOwner}.github.io/${site.repo}`;
+    const newRepo = site.newRepo || site.repo;
+    const base = `https://${newOwner}.github.io/${newRepo}`;
     const oldUrl = `https://${oldOwner}.github.io/${site.repo}/`;
     console.log(`\n=== ${site.repo} ===`);
 
-    if (repoExists(oldOwner, site.repo)) {
+    const oldInfo = repoInfo(oldOwner, site.repo);
+    const newInfo = repoInfo(newOwner, newRepo);
+    const transferred = newInfo && newInfo.full_name === `${newOwner}/${newRepo}`;
+
+    if (!transferred) {
       console.log("  overdracht nog niet afgerond bij de nieuwe eigenaar, overslaan");
       continue;
     }
-    if (!repoExists(newOwner, site.repo)) {
-      console.log("  website staat niet (meer) bij de nieuwe eigenaar, overslaan");
-      continue;
-    }
-    console.log(`  website staat bij ${newOwner}`);
+    console.log(`  website staat bij ${newOwner}/${newRepo}`);
 
-    if (!repoExists(oldOwner, site.repo)) {
+    const forwarderExists =
+      oldInfo &&
+      oldInfo.full_name === `${oldOwner}/${site.repo}` &&
+      (oldInfo.description || "").startsWith("Doorstuurpagina");
+
+    if (!forwarderExists) {
+      if (oldInfo && oldInfo.full_name === `${oldOwner}/${site.repo}`) {
+        console.log("  de oude naam is nog bezet door de website zelf, overslaan");
+        continue;
+      }
       if (dryRun) {
         console.log(`  zou repository ${oldOwner}/${site.repo} aanmaken`);
       } else {
@@ -201,6 +235,8 @@ async function run() {
         ]);
         console.log(`  repository ${oldOwner}/${site.repo} aangemaakt`);
       }
+    } else {
+      console.log(`  doorstuurpagina ${oldOwner}/${site.repo} bestaat al`);
     }
 
     const files = [
@@ -216,7 +252,7 @@ async function run() {
       },
       {
         path: "README.md",
-        content: readme(site),
+        content: readme(site, newRepo),
         message: "Beschrijf de doorstuurpagina",
       },
       ...site.pages.map((page) => ({
@@ -244,24 +280,36 @@ async function run() {
       continue;
     }
 
-    const pages = gh(
-      ["api", "--method", "POST", `repos/${oldOwner}/${site.repo}/pages`, "-f", "build_type=workflow"],
-      { allowFail: true }
-    );
-    if (pages) {
-      console.log("  GitHub Pages aangezet (workflow)");
+    const pagesReady = gh(["api", `repos/${oldOwner}/${site.repo}/pages`], { allowFail: true });
+    if (pagesReady) {
+      console.log("  GitHub Pages staat al aan");
     } else {
-      gh([
-        "api",
-        "--method",
-        "POST",
-        `repos/${oldOwner}/${site.repo}/pages`,
-        "-f",
-        "source[branch]=main",
-        "-f",
-        "source[path]=/",
-      ]);
-      console.log("  GitHub Pages aangezet (branch)");
+      const pages = gh(
+        [
+          "api",
+          "--method",
+          "POST",
+          `repos/${oldOwner}/${site.repo}/pages`,
+          "-f",
+          "build_type=workflow",
+        ],
+        { allowFail: true }
+      );
+      if (pages) {
+        console.log("  GitHub Pages aangezet (workflow)");
+      } else {
+        gh([
+          "api",
+          "--method",
+          "POST",
+          `repos/${oldOwner}/${site.repo}/pages`,
+          "-f",
+          "source[branch]=main",
+          "-f",
+          "source[path]=/",
+        ]);
+        console.log("  GitHub Pages aangezet (branch)");
+      }
     }
 
     const live = await waitForLive(oldUrl, base);
