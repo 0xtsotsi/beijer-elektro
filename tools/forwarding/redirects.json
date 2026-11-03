@@ -1,0 +1,48 @@
+{
+  "oldOwner": "jalvdbroek-ship-it",
+  "newOwner": "0xtsotsi",
+  "sites": [
+    {
+      "repo": "beijer-elektro",
+      "name": "Beijer Elektro",
+      "description": "Electrotechnisch Bedrijf Beijer in Rozenburg. Stoppenkasten, installaties, storingen, verlichting, laadpalen en zonnepanelen. 24/7 bereikbaar, reactie binnen 24 uur.",
+      "pages": ["/"]
+    },
+    {
+      "repo": "body-action-xl",
+      "name": "Body Action XL",
+      "description": "Body Action XL is de sportschool in Rozenburg met de meeste groepslessen: HYROX, Steps, Spinning, Pilates, Xcore en HIIT. Sinds 1999, twee zalen aan de Molenweg 47A. Vraag een proefles aan.",
+      "pages": ["/"]
+    },
+    {
+      "repo": "cafetaria-de-zon",
+      "name": "Cafetaria De Zon",
+      "description": "Snackbar De Zon aan het Noordeinde 12 in Zwartewaal. Verse Hollandse friet, krokante snacks, burgers, milkshakes en softijs. Neem je snack mee, of zit lekker op het terras.",
+      "pages": ["/"]
+    },
+    {
+      "repo": "de-gouden-kurk-site",
+      "name": "De Gouden Kurk",
+      "description": "De Gouden Kurk is de drankenhandel aan het Raadhuisplein 6 in Rozenburg. Bekijk het conceptassortiment en bestel straks online met afhalen of bezorging.",
+      "pages": ["/"]
+    },
+    {
+      "repo": "hotel-rozenburg",
+      "name": "Hotel Rozenburg",
+      "description": "Hotel Rozenburg: 27 stijlvolle kamers in het groene dorp Rozenburg, met Brasserie Noortje, gratis parkeren en ontbijt.",
+      "pages": ["/", "/hotel.html", "/restaurant.html", "/arrangementen.html", "/contact.html"]
+    },
+    {
+      "repo": "la-caleta",
+      "name": "Restaurant La Caleta",
+      "description": "Restaurant La Caleta in Rozenburg: Spaanse tapas, grill en verse vis. Gezellige sfeer, al sinds 2007 in het hart van Rozenburg.",
+      "pages": ["/", "/menu/", "/tapas/", "/over-ons/", "/acties/", "/contact/"]
+    },
+    {
+      "repo": "lils-haarsalon-site",
+      "name": "Lil's Haarsalon",
+      "description": "Lil's haarsalon in het centrum van Rozenburg. Knippen, kleuren en verzorgen voor dames, heren en kinderen. Gediplomeerde kapsters, betaalbare prijzen.",
+      "pages": ["/", "/behandelingen/", "/over-ons/", "/contact/"]
+    }
+  ]
+}

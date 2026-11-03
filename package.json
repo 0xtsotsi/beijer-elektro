@@ -15,7 +15,10 @@
     "check:current": "node tools/check-current.mjs",
     "check:mail": "node tools/check-mailfallback.mjs",
     "check:live": "node tools/check-live.mjs",
-    "shots": "node tools/shoot-sections.mjs"
+    "shots": "node tools/shoot-sections.mjs",
+    "forwarding:create": "node tools/forwarding/create-forwarding.mjs",
+    "forwarding:urls": "node tools/forwarding/update-site-urls.mjs",
+    "check:forwarding-contrast": "node tools/forwarding/check-contrast.mjs"
   },
   "engines": {
     "node": ">=18"
