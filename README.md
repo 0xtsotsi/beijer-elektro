@@ -5,10 +5,10 @@ Rozenburg (ZH). Geen build-stap, geen dependencies.
 
 ## De live site
 
-**https://jalvdbroek-ship-it.github.io/beijer-elektro/**
+**https://0xtsotsi.github.io/beijer-elektro/**
 
 Die link is permanent en altijd bereikbaar. De site staat op GitHub Pages: de code
-staat in de repository `jalvdbroek-ship-it/beijer-elektro` en elke keer dat je naar
+staat in de repository `0xtsotsi/beijer-elektro` en elke keer dat je naar
 `main` pusht, bouwt GitHub de site opnieuw. De repo is openbaar, want GitHub Pages is
 op een gratis account alleen mogelijk voor openbare repos. Er staat geen
 privékleding of wachtwoord in.

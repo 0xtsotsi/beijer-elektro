@@ -72,5 +72,5 @@ opdracht.
 | Projectfoto's | "projectfoto's" | Projecten, met drop-in fotoplatsen | gedeeltelijk, wachten op foto's |
 | Beoordeling zichtbaar | "beoordelen" | sectie Wat klanten zeggen | waargemaakt |
 | Minimaal een 9 | "minimaal een 9" | rubric 23 van 24 | waargemaakt |
-| Repository op GitHub | "repo in github" | jalvdbroek-ship-it/beijer-elektro | waargemaakt |
-| Live link | "plaats je de website link" | https://jalvdbroek-ship-it.github.io/beijer-elektro/ | waargemaakt |
+| Repository op GitHub | "repo in github" | 0xtsotsi/beijer-elektro | waargemaakt |
+| Live link | "plaats je de website link" | https://0xtsotsi.github.io/beijer-elektro/ | waargemaakt |
